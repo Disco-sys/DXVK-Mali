@@ -20,20 +20,27 @@ namespace dxvk {
     m_objects           (this),
     m_submissionQueue   (this) {
     
-    // --- DISCO-SYS MALI PERFORMANCE OVERRIDE ---
-    // 1. Fix Black Screen: Force nullDescriptor support even if driver is shy
+    // --- DISCO-SYS MALI PERFORMANCE OVERRIDE v1.0 ---
+    // 1. Fix Black Screen: Force nullDescriptor support (Mali GPUs need this for OOB reads)
     m_features.extRobustness2.nullDescriptor = VK_TRUE;
 
-    // 2. Optimization: Disable CPU-heavy bounds checking on Mali
+    // 2. Optimization: Disable CPU-heavy bounds checking on budget Helio G85 cores
     m_features.core.features.robustBufferAccess = VK_FALSE;
 
-    // 3. Compatibility: Fake Dual Source Blending for Feature Level 11_1
+    // 3. Compatibility: Fake Features for DX11 Feature Level 11_1
     m_features.core.features.dualSrcBlend = VK_TRUE;
     m_features.core.features.logicOp = VK_TRUE;
     
-    // 4. Geometry Hack: Prevent Mali crashes by limiting massive tessellation
+    // 4. Memory Optimization: Prioritize Integrated Paths
+    // Mali-G52 MC2 has limited bandwidth; we set a threshold to favor local system RAM
+    m_objects.memoryManager().setDeviceLocalThreshold(0.5f); 
+
+    // 5. Descriptor Hack: Limit pool size to prevent Mali driver overhead (CPU stutters)
+    m_properties.core.properties.limits.maxBoundDescriptorSets = 4;
+
+    // 6. Geometry & Shader Hack: Prevent clip-distance related crashes
     if (m_features.core.features.tessellationShader) {
-       // We keep the feature enabled but will limit it in the pipeline
+       // Enabled but pipeline-limited via dxvk.conf (d3d11.maxTessFactor = 8)
     }
     // -------------------------------------------
 
@@ -51,8 +58,8 @@ namespace dxvk {
   }
 
   bool DxvkDevice::isUnifiedMemoryArchitecture() const {
-    // Mali is UMA (Shared System/Video RAM), this returns true for Helio G85
-    return m_adapter->isUnifiedMemoryArchitecture();
+    // Force true: Helio G85 uses shared system memory for GPU tasks
+    return true;
   }
 
   DxvkFramebufferSize DxvkDevice::getDefaultFramebufferSize() const {
@@ -230,7 +237,7 @@ namespace dxvk {
   
   DxvkDevicePerfHints DxvkDevice::getPerfHints() {
     DxvkDevicePerfHints hints;
-    // Mali/MediaTek optimization: favor resolve and depth stencil copy
+    // Mali-specific TBDR optimization: favor FB resolve and stencil copies
     hints.preferFbDepthStencilCopy = VK_TRUE;
     hints.preferFbResolve = VK_TRUE;
     return hints;
