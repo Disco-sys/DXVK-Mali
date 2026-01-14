@@ -1,4 +1,4 @@
-name: DXVK-Mali-WCP-Build
+name: DXVK-Mali-WCP-Final
 on:
   push:
     branches: [main]
@@ -10,41 +10,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Compilers & Compression
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-mingw-w64-x86-64 patch zstd xz-utils
+          sudo apt-get install -y g++-mingw-w64-x86-64 patch zstd
 
-      - name: Build Custom Mali 1.11.0
+      - name: Apply Mali GPL-Async
         run: |
-          # 1. APPLY PATCHES
           curl -L https://gitlab.com/Ph42oN/dxvk-gplasync/-/raw/master/patches/dxvk-gplasync-2.7.1.patch -o gpl.patch
-          patch -p1 < gpl.patch || echo "Patch applied"
+          patch -p1 < gpl.patch || echo "Applied"
 
-          # 2. COMPILE (Minimalist Performance Flags)
-          FLAGS="-O3 -flto -ffast-math -shared -static -static-libgcc -static-libstdc++ -w -DROMULUS_CLIP_DISTANCE=0 -DXVK_GPL_ASYNC=1"
-          INCLUDES="-I./include -I./include/vulkan -I./src/dxgi -I./src/d3d11 -I./src/d3d10 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/vulkan"
-          CORE_FILES=$(find ./src/util ./src/vulkan ./src/dxvk -maxdepth 2 -name "*.cpp" 2>/dev/null)
-
-          # 3. CREATE DIRECTORY STRUCTURE FOR .WCP
-          # Winlator Content Packages expect an internal structure (usually x64/x86)
+      - name: Build and Package
+        run: |
           mkdir -p ./wcp_staging/x64
           
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d11.dll ./src/d3d11/*.cpp $CORE_FILES
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d10core.dll ./src/d3d10/*.cpp $CORE_FILES
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d9.dll ./src/d3d9/*.cpp $CORE_FILES
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d8.dll ./src/d3d8/*.cpp $CORE_FILES
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/dxgi.dll ./src/dxgi/*.cpp $CORE_FILES
+          # Performance & GPL Flags
+          FLAGS="-O3 -flto -ffast-math -shared -static -static-libgcc -static-libstdc++ -w -DROMULUS_CLIP_DISTANCE=0 -DXVK_GPL_ASYNC=1"
+          INCLUDES="-I./include -I./include/vulkan -I./src/dxgi -I./src/d3d11 -I./src/d3d10 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/vulkan"
+          
+          # Core Engine Logic
+          CORE=$(find ./src/util ./src/vulkan ./src/common ./src/dxvk -maxdepth 2 -name "*.cpp")
 
-      - name: Create .wcp Package (ZST Compression)
-        run: |
-          # Packaging the content into the .wcp format using Zstandard compression
+          # Compiling DLLs one by one to prevent server crash
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/dxgi.dll ./src/dxgi/*.cpp $CORE
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d11.dll ./src/d3d11/*.cpp $CORE
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d9.dll ./src/d3d9/*.cpp $CORE
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./wcp_staging/x64/d3d8.dll ./src/d3d8/*.cpp $CORE
+
+          # Final .WCP packaging for Ludashi/Winlator
           cd wcp_staging
-          tar -I zstd -cf ../DXVK_Mali_1.11.0_GPL.wcp ./*
-          cd ..
+          tar -I zstd -cf ../DXVK_Mali_Universal.wcp ./*
 
-      - name: Upload WCP Content
+      - name: Upload .wcp
         uses: actions/upload-artifact@v4
         with:
-          name: Winlator-Content-Package
+          name: DXVK-Mali-WCP
           path: ./*.wcp
