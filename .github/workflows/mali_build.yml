@@ -1,24 +1,52 @@
-      - name: Build Turbo Version
+name: DXVK-Mali-G52-Ultimate
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64
+
+      - name: Build Ultimate Version
         run: |
           mkdir -p ./build_output
           
-          # Flags with your custom branding
-          FLAGS="-O3 -ffast-math -shared -static -static-libgcc -static-libstdc++ \
+          # ULTIMATE PERFORMANCE FLAGS:
+          # -flto: Link Time Optimization (The biggest boost)
+          # -ffast-math & -ffp-contract=fast: Extreme math speed
+          # -funroll-loops: Helps the small G52 cores process faster
+          # -DROMULUS_CLIP_DISTANCE=0: Fixes Black Screen
+          
+          FLAGS="-O3 -flto -ffast-math -ffp-contract=fast -funroll-loops -shared -static -static-libgcc -static-libstdc++ \
                  -DDXVK_VERSION=\"\\\"DXVK-Mali async Pre-release1\\\"\" \
-                 -DDXVK_FEATURE_LEVEL=11_0 \
+                 -DDXVK_FEATURE_LEVEL=11_1 \
                  -DROMULUS_CLIP_DISTANCE=0"
           
-          # Updated INCLUDES to find the d3d8 source files
           INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/common"
           
-          echo "Compiling d3d8 (Legacy Support)..."
+          echo "Compiling Ultimate DXVK-Mali (LTO Enabled)..."
+          
           x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/d3d8_main.cpp && \
-
-          echo "Compiling dxgi..."
           x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/dxgi_main.cpp && \
-
-          echo "Compiling d3d11..."
           x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/d3d11_main.cpp && \
-
-          echo "Compiling d3d9..."
           x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/d3d9_main.cpp
+
+      - name: Verify and List Files
+        run: |
+          ls -lh ./build_output
+          if [ ! -f ./build_output/dxgi.dll ]; then exit 1; fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DXVK-Mali-async-Ultimate-Pre-release1
+          path: ./build_output/
