@@ -21,25 +21,28 @@ namespace dxvk {
     m_submissionQueue   (this) {
     
     // --- DISCO-SYS MALI PERFORMANCE OVERRIDE v1.0 ---
-    // Safe Check: Use 'm_properties' which is already loaded, and cast the ID to avoid errors.
+    // We create a "key" to unlock the settings so we can edit them
+    auto& f = const_cast<DxvkDeviceFeatures&>(m_features);
+
+    // 1. Check if the phone uses a Mali GPU (ID: 0x13B5)
     if (m_properties.core.properties.vendorID == uint32_t(0x13B5)) {
-        // 1. Fix Black Screen: Force nullDescriptor support
-        m_features.extRobustness2.nullDescriptor = VK_TRUE;
+        // Fix Black Screen: Force support for missing textures
+        f.extRobustness2.nullDescriptor = VK_TRUE;
 
-        // 2. Optimization: Disable CPU-heavy bounds checking
-        m_features.core.features.robustBufferAccess = VK_FALSE;
+        // Optimization: Disable heavy safety checks to boost FPS on Helio G85
+        f.core.features.robustBufferAccess = VK_FALSE;
 
-        // 3. Descriptor Hack: Limit pool size to prevent Mali driver overhead
+        // Prevent Stutters: Limit how many things the GPU tracks at once
         m_properties.core.properties.limits.maxBoundDescriptorSets = 4;
     }
 
-    // 4. Compatibility: Fake Features for DX11 Feature Level 11_1
-    m_features.core.features.dualSrcBlend = VK_TRUE;
-    m_features.core.features.logicOp = VK_TRUE;
+    // 2. Compatibility: Tell games we support modern DX11 features
+    f.core.features.dualSrcBlend = VK_TRUE;
+    f.core.features.logicOp = VK_TRUE;
     
-    // 5. Geometry Hack: Prevent crash if tessellation is used heavily
-    if (m_features.core.features.tessellationShader) {
-       // Kept enabled, logic in pipeline will handle limits
+    // 3. Geometry Hack: Safety check for Tessellation
+    if (f.core.features.tessellationShader) {
+       // Enabled for compatibility
     }
     // -------------------------------------------
 
@@ -57,7 +60,6 @@ namespace dxvk {
   }
 
   bool DxvkDevice::isUnifiedMemoryArchitecture() const {
-    // Return true for Mali/Helio chips to optimize memory paths
     return m_adapter->isUnifiedMemoryArchitecture();
   }
 
@@ -198,7 +200,7 @@ namespace dxvk {
     submitInfo.wakeSync = wakeSync;
     m_submissionQueue.submit(submitInfo);
 
-    std::lock_guard<sync::Spinlock> statLock(m_statLock);
+    std::lock_guard<sync::Spinlock> lock(m_statLock);
     m_statCounters.merge(commandList->statCounters());
     m_statCounters.addCtr(DxvkStatCounter::QueueSubmitCount, 1);
   }
@@ -236,7 +238,6 @@ namespace dxvk {
   
   DxvkDevicePerfHints DxvkDevice::getPerfHints() {
     DxvkDevicePerfHints hints;
-    // Mali-specific TBDR optimization: favor FB resolve and stencil copies
     hints.preferFbDepthStencilCopy = VK_TRUE;
     hints.preferFbResolve = VK_TRUE;
     return hints;
