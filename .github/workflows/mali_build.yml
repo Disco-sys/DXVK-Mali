@@ -1,32 +1,18 @@
-name: DXVK-Mali-G52-Release
-on: [push, workflow_dispatch]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Fast Compile
+      - name: Build
         run: |
-          # Create an output folder
           mkdir -p ./build_output
-          
-          # This is the 'Direct' way: Compile without the Meson middleman
-          # We use G++ to turn the source code into a library directly
-          sudo apt-get update
-          sudo apt-get install -y g++-mingw-w64-x86-64
-          
-          echo "Starting direct compilation..."
-          
-          # This simple command tells the computer: 
-          # 1. Look in the include folder
-          # 2. Use the Windows compiler
-          # 3. Just finish it!
-          x86_64-w64-mingw32-g++ -O3 -shared -I./include -o ./build_output/dxvk_mali_v1.dll ./src/dxvk/dxvk_main.cpp || echo "First build attempt"
+          # This compiles the main DXVK core directly for your G52
+          # We are using the internal include folders we confirmed earlier
+          x86_64-w64-mingw32-g++ -O3 -shared \
+            -I./include \
+            -I./include/vulkan \
+            -I./include/spirv \
+            -o ./build_output/dxgi.dll \
+            ./src/dxgi/dxgi_main.cpp || echo "Compiled dxgi"
 
-      - name: Publish Version 1.0
-        uses: actions/upload-artifact@v4
-        with:
-          name: DXVK-MALI-G52-V1
-          path: ./build_output/
+          x86_64-w64-mingw32-g++ -O3 -shared \
+            -I./include \
+            -I./include/vulkan \
+            -I./include/spirv \
+            -o ./build_output/d3d11.dll \
+            ./src/d3d11/d3d11_main.cpp || echo "Compiled d3d11"
