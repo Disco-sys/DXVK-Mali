@@ -35,16 +35,7 @@ if get_option('build_id')
 endif
 
 dxvk_include_dirs = ['./include']
-if fs.is_dir('./include/vulkan/include')
-  dxvk_include_dirs += ['./include/vulkan/include']
-elif not cpp.check_header('vulkan/vulkan.h')
-  error('Missing Vulkan-Headers')
-endif
-if fs.is_dir('./include/spirv/include')
-  dxvk_include_dirs += ['./include/spirv/include']
-elif not cpp.check_header('spirv/unified1/spirv.hpp')
-  error('Missing SPIRV-Headers')
-endif
+dxvk_include_dirs += ['./include/vulkan/include', './include/spirv/include']
 
 if platform == 'windows'
   compiler_args += [
