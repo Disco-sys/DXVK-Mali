@@ -21,17 +21,14 @@ namespace dxvk {
     m_submissionQueue   (this) {
     
     // --- DISCO-SYS MALI PERFORMANCE OVERRIDE ---
-    // This "f" variable is our key to unlocking the Read-Only settings.
+    // This is the "Master Key" (f) that unlocks the Read-Only settings
     auto& f = const_cast<DxvkDeviceFeatures&>(m_features);
 
-    // FIX FOR ERRORS 1 & 2: We use our 'f' key to change the settings.
+    // Using the key to force the logic switches to "ON"
     f.core.features.logicOp = VK_TRUE;
     f.core.features.dualSrcBlend = VK_TRUE;
 
-    // FIX FOR ERROR 3 & 4: We removed the "D3D11" and "Feature Level" 
-    // words that were causing the crash.
-    
-    // MALI OPTIMIZATION: Specifically for your Helio G85
+    // Check if the GPU is Mali (0x13B5) and apply Helio G85 optimizations
     if (m_properties.core.properties.vendorID == uint32_t(0x13B5)) {
         f.extRobustness2.nullDescriptor = VK_TRUE;
         f.core.features.robustBufferAccess = VK_FALSE;
@@ -43,8 +40,6 @@ namespace dxvk {
     m_queues.graphics = getQueue(queueFamilies.graphics, 0);
     m_queues.transfer = getQueue(queueFamilies.transfer, 0);
   }
-
-  // ... (The rest of the file remains the same as standard DXVK)
   
   DxvkDevice::~DxvkDevice() {
     if (this_thread::isInModuleDetachment()) return;
