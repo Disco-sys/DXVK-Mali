@@ -16,27 +16,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-mingw-w64-x86-64
 
+      - name: Inject Custom Name into Source
+        run: |
+          # This 'sed' command finds the version string in the source and overwrites it
+          # It looks for the version file and forces your name into the code
+          mkdir -p ./src/util
+          echo '#define DXVK_VERSION "DXVK-Mali-Async"' > ./src/util/version.h
+          echo 'static const char* dxvk_version = "DXVK-Mali-Async";' >> ./src/util/version.h
+
       - name: Build Ultimate Version
         run: |
           mkdir -p ./build_output
           
-          # FIXED FLAGS: Removed the complex escaped quotes that caused the 'async' error
-          # Using a single string with no spaces for the internal version to be safe
-          # But the Artifact name below will still have the full name you want!
-          
+          # Ultimate Flags for G52 (LTO + Math speed)
           FLAGS="-O3 -flto -ffast-math -ffp-contract=fast -funroll-loops -shared -static -static-libgcc -static-libstdc++ \
-                 -DDXVK_VERSION=\"DXVK-Mali-Sarek-Async\" \
                  -DDXVK_FEATURE_LEVEL=11_1 \
                  -DROMULUS_CLIP_DISTANCE=0"
           
-          INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/common"
+          INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/common -I./src/vulkan"
           
-          echo "Compiling Ultimate DXVK-Mali..."
+          echo "Compiling with Hardcoded Branding..."
           
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/d3d8_main.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/dxgi_main.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/d3d11_main.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/d3d9_main.cpp
+          # Compiling the suite with the new internal versioning
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/*.cpp ./src/util/*.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/*.cpp ./src/util/*.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/*.cpp ./src/dxvk/*.cpp ./src/util/*.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/*.cpp ./src/util/*.cpp
 
       - name: Verify and List Files
         run: |
@@ -46,5 +51,5 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DXVK-Mali-async-Ultimate-Pre-release1
+          name: DXVK-Mali-Async-Ultimate
           path: ./build_output/
