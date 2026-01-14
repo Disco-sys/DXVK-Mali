@@ -16,32 +16,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++-mingw-w64-x86-64
 
-      - name: Inject Custom Name into Source
+      - name: Inject Custom Name
         run: |
-          # This 'sed' command finds the version string in the source and overwrites it
-          # It looks for the version file and forces your name into the code
           mkdir -p ./src/util
+          # This ensures the name is hardcoded in the utility headers
           echo '#define DXVK_VERSION "DXVK-Mali-Async"' > ./src/util/version.h
-          echo 'static const char* dxvk_version = "DXVK-Mali-Async";' >> ./src/util/version.h
 
       - name: Build Ultimate Version
         run: |
           mkdir -p ./build_output
           
-          # Ultimate Flags for G52 (LTO + Math speed)
+          # ULTIMATE PERFORMANCE FLAGS
           FLAGS="-O3 -flto -ffast-math -ffp-contract=fast -funroll-loops -shared -static -static-libgcc -static-libstdc++ \
                  -DDXVK_FEATURE_LEVEL=11_1 \
                  -DROMULUS_CLIP_DISTANCE=0"
           
+          # We include the most vital source folders
           INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/common -I./src/vulkan"
           
-          echo "Compiling with Hardcoded Branding..."
+          echo "Compiling DXVK-Mali-Async..."
           
-          # Compiling the suite with the new internal versioning
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/*.cpp ./src/util/*.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/*.cpp ./src/util/*.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/*.cpp ./src/dxvk/*.cpp ./src/util/*.cpp && \
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/*.cpp ./src/util/*.cpp
+          # Link only the main components to avoid 'multiple definition' errors
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/d3d8_main.cpp ./src/util/util_string.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/dxgi_main.cpp ./src/util/util_string.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/d3d11_main.cpp ./src/util/util_string.cpp && \
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/d3d9_main.cpp ./src/util/util_string.cpp
 
       - name: Verify and List Files
         run: |
