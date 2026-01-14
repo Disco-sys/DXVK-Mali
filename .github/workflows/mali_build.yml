@@ -1,43 +1,24 @@
-name: DXVK-Mali-G52-Turbo
-on: [push, workflow_dispatch]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-mingw-w64-x86-64
-
       - name: Build Turbo Version
         run: |
           mkdir -p ./build_output
           
-          # TURBO FLAGS for G52 MC2:
-          # -O3: Max optimization
-          # -ffast-math: Speeds up 3D calculations
-          # -fno-semantics-interposition: Faster function calls
-          # -I: Tells the compiler exactly where to find the headers
+          # Flags with your custom branding
+          FLAGS="-O3 -ffast-math -shared -static -static-libgcc -static-libstdc++ \
+                 -DDXVK_VERSION=\"\\\"DXVK-Mali async Pre-release1\\\"\" \
+                 -DDXVK_FEATURE_LEVEL=11_0 \
+                 -DROMULUS_CLIP_DISTANCE=0"
           
-          FLAGS="-O3 -ffast-math -fno-semantics-interposition -shared -static -static-libgcc -static-libstdc++"
+          # Updated INCLUDES to find the d3d8 source files
+          INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/d3d8 -I./src/util -I./src/dxvk -I./src/common"
           
-          # Fix the Include Paths so "d3d11_main.h" is found
-          INCLUDES="-I./include -I./include/vulkan -I./include/spirv -I./src/dxgi -I./src/d3d11 -I./src/d3d9 -I./src/util"
-          
-          echo "Compiling Optimized DXGI..."
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/dxgi_main.cpp || echo "DXGI Build"
+          echo "Compiling d3d8 (Legacy Support)..."
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d8.dll ./src/d3d8/d3d8_main.cpp && \
 
-          echo "Compiling Optimized D3D11..."
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/d3d11_main.cpp || echo "D3D11 Build"
+          echo "Compiling dxgi..."
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/dxgi.dll ./src/dxgi/dxgi_main.cpp && \
 
-          echo "Compiling Optimized D3D9..."
-          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/d3d9_main.cpp || echo "D3D9 Build"
+          echo "Compiling d3d11..."
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d11.dll ./src/d3d11/d3d11_main.cpp && \
 
-      - name: Upload Optimized DLLs
-        uses: actions/upload-artifact@v4
-        with:
-          name: DXVK-MALI-G52-TURBO
-          path: ./build_output/
+          echo "Compiling d3d9..."
+          x86_64-w64-mingw32-g++ $FLAGS $INCLUDES -o ./build_output/d3d9.dll ./src/d3d9/d3d9_main.cpp
