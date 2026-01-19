@@ -1,58 +1,40 @@
-name: Artifacts (Package)
+name: Build and Upload
 
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
-  artifacts-mingw-w64:
+  mali-build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      id: checkout-code
+    - name: Checkout
       uses: actions/checkout@v4
       with:
         submodules: recursive
-        fetch-depth: 0
 
-    - name: Setup problem matcher
-      uses: Joshua-Ashton/gcc-problem-matcher@v3
-
-    - name: Build release
-      id: build-release
+    - name: Compiler
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # 1. INSTALL VULKAN HEADERS & DEPENDENCIES
-          # This fixes the "vulkan.h: No such file" error for good
+          # Install headers so the compiler understands Vulkan
           sudo pacman -S --noconfirm vulkan-headers
-
-          # 2. THE MASTER MALI VARIABLE PATCH
-          # Defines EVERY variable the Mali fork's build system is looking for
-          # so you don't get "Unknown variable" errors one-by-one anymore.
+          
+          # Fix the Mali fork's internal missing links
           PATCH="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\n"
           PATCH+="dll_ext = '.dll'\n"
           PATCH+="def_spec_ext = '.def'\n"
           PATCH+="lib_dxgi = declare_dependency(link_args: ['-ldxgi'])\n"
           PATCH+="lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])\n"
-          PATCH+="lib_d3d10core = declare_dependency(link_args: ['-ld3d10core'])\n"
           PATCH+="lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])"
-          
-          # Inject the patch after the project() line
           sed -i "2i $PATCH" meson.build
           
-          # 3. SETUP VERSION & SCRIPT
-          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0-Mali"' > ./src/dxvk/dxvk_version.h
+          # Compile the DLLs
+          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "Mali-Universal"' > ./src/dxvk/dxvk_version.h
           chmod +x package-release.sh
+          ./package-release.sh master build --no-package
 
-          # Set clean version and run the actual build
-          export VERSION_NAME="master"
-          ./package-release.sh ${VERSION_NAME} build --no-package
-          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
-
-    - name: Upload artifacts
-      id: upload-artifacts
+    - name: Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dxvk-mali-build
+        name: dxvk-mali-universal
         path: build/dxvk-master
-        if-no-files-found: error
