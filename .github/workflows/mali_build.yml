@@ -1,30 +1,44 @@
 name: Artifacts (Package)
+
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
   artifacts-mingw-w64:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
+      id: checkout-code
       uses: actions/checkout@v4
       with:
         submodules: recursive
         fetch-depth: 0
 
-    - name: Build Fixes
-      run: |
-        mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0"' > ./src/dxvk/dxvk_version.h
-        chmod +x package-release.sh
+    - name: Setup problem matcher
+      uses: Joshua-Ashton/gcc-problem-matcher@v3
 
     - name: Build release
+      id: build-release
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          ./package-release.sh master build --no-package
+          # --- NECESSARY FIX START ---
+          # 1. Inject the missing generator into meson.build (Fixes the dxgi crash)
+          sed -i "1i wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])" meson.build
+          
+          # 2. Ensure version header exists and script is executable
+          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0"' > ./src/dxvk/dxvk_version.h
+          chmod +x package-release.sh
+          # --- NECESSARY FIX END ---
+
+          export VERSION_NAME="${GITHUB_REF##*/}"
+          ./package-release.sh ${VERSION_NAME} build --no-package
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
 
     - name: Upload artifacts
+      id: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dxvk-mali-build
-        path: build/dxvk-master
+        name: dxvk-sarek-${{ env.VERSION_NAME }}
+        path: build/dxvk-${{ env.VERSION_NAME }}
         if-no-files-found: error
