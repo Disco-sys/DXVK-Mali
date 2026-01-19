@@ -22,27 +22,29 @@ jobs:
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # --- THE MASTER MALI VARIABLE PATCH ---
-          # This defines EVERYTHING to prevent the one-by-one error cycle:
-          # 1. Generators & Extensions
-          # 2. Cross-Library Links (lib_dxgi, lib_d3d11, lib_d3d9)
+          # 1. INSTALL VULKAN HEADERS & DEPENDENCIES
+          # This fixes the "vulkan.h: No such file" error for good
+          sudo pacman -S --noconfirm vulkan-headers
+
+          # 2. THE MASTER MALI VARIABLE PATCH
+          # Defines EVERY variable the Mali fork's build system is looking for
+          # so you don't get "Unknown variable" errors one-by-one anymore.
+          PATCH="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\n"
+          PATCH+="dll_ext = '.dll'\n"
+          PATCH+="def_spec_ext = '.def'\n"
+          PATCH+="lib_dxgi = declare_dependency(link_args: ['-ldxgi'])\n"
+          PATCH+="lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])\n"
+          PATCH+="lib_d3d10core = declare_dependency(link_args: ['-ld3d10core'])\n"
+          PATCH+="lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])"
           
-          PATCH_CODE="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\n"
-          PATCH_CODE+="dll_ext = '.dll'\n"
-          PATCH_CODE+="def_spec_ext = '.def'\n"
-          PATCH_CODE+="lib_dxgi = declare_dependency(link_args: ['-ldxgi'])\n"
-          PATCH_CODE+="lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])\n"
-          PATCH_CODE+="lib_d3d10core = declare_dependency(link_args: ['-ld3d10core'])\n"
-          PATCH_CODE+="lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])"
+          # Inject the patch after the project() line
+          sed -i "2i $PATCH" meson.build
           
-          # Inject all at once after the project() line
-          sed -i "2i $PATCH_CODE" meson.build
-          
-          # Fix version header and script permissions
-          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0"' > ./src/dxvk/dxvk_version.h
+          # 3. SETUP VERSION & SCRIPT
+          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0-Mali"' > ./src/dxvk/dxvk_version.h
           chmod +x package-release.sh
 
-          # Set clean version and run build
+          # Set clean version and run the actual build
           export VERSION_NAME="master"
           ./package-release.sh ${VERSION_NAME} build --no-package
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
