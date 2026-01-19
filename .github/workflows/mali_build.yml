@@ -1,34 +1,21 @@
-name: Artifacts (Package)
-
-on: [push, pull_request, workflow_dispatch]
-
-jobs:
-  artifacts-mingw-w64:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      id: checkout-code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - name: Setup problem matcher
-      uses: Joshua-Ashton/gcc-problem-matcher@v3
-
     - name: Build release
       id: build-release
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # --- THE FINAL VARIABLE FIXES ---
-          # We inject all three missing Mali-specific variables at once:
-          # 1. wrc_generator (Resource files)
-          # 2. dll_ext (Standard .dll extension)
-          # 3. def_spec_ext (Standard .def extension)
+          # --- THE FINAL COMPREHENSIVE FIX ---
+          # We inject all missing Mali-specific variables at once:
+          # 1. wrc_generator: Handles resource files
+          # 2. dll_ext & def_spec_ext: Handle file naming
+          # 3. lib_dxgi: Defines the dependency link for D3D11
           
-          sed -i "2i wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\ndll_ext = '.dll'\ndef_spec_ext = '.def'" meson.build
+          VAR_FIXES="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\ndll_ext = '.dll'\ndef_spec_ext = '.def'\nlib_dxgi = declare_dependency(link_with: subproject('dxgi').get_variable('dxgi_dll'))"
+          
+          # If subprojects aren't used, we use a simpler link:
+          # VAR_FIXES="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\ndll_ext = '.dll'\ndef_spec_ext = '.def'\nlib_dxgi = declare_dependency(link_args: ['-ldxgi'])"
+          
+          # Using the standard link_args version as it is safer for cross-compiling
+          sed -i "2i wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\ndll_ext = '.dll'\ndef_spec_ext = '.def'\nlib_dxgi = declare_dependency(link_args: ['-ldxgi'])" meson.build
           
           # Fix version header and script permissions
           mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0"' > ./src/dxvk/dxvk_version.h
@@ -38,11 +25,3 @@ jobs:
           export VERSION_NAME="master"
           ./package-release.sh ${VERSION_NAME} build --no-package
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
-
-    - name: Upload artifacts
-      id: upload-artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dxvk-mali-build
-        path: build/dxvk-master
-        if-no-files-found: error
