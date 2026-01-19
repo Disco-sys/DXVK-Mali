@@ -22,16 +22,15 @@ jobs:
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # --- NECESSARY FIX START ---
-          # 1. Inject the missing generator into meson.build (Fixes the dxgi crash)
+          # --- THE FIX: Define the missing resource generator for Mali ---
           sed -i "1i wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])" meson.build
           
-          # 2. Ensure version header exists and script is executable
+          # Ensure version file exists so the script doesn't crash later
           mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "1.11.0"' > ./src/dxvk/dxvk_version.h
           chmod +x package-release.sh
-          # --- NECESSARY FIX END ---
 
-          export VERSION_NAME="${GITHUB_REF##*/}"
+          # Set a clean version name (master) to avoid path errors
+          export VERSION_NAME="master"
           ./package-release.sh ${VERSION_NAME} build --no-package
           echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
 
@@ -39,6 +38,6 @@ jobs:
       id: upload-artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dxvk-sarek-${{ env.VERSION_NAME }}
-        path: build/dxvk-${{ env.VERSION_NAME }}
+        name: dxvk-mali-build
+        path: build/dxvk-master
         if-no-files-found: error
