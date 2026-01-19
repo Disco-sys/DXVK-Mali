@@ -16,19 +16,21 @@ jobs:
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # Install headers so the compiler understands Vulkan
-          sudo pacman -S --noconfirm vulkan-headers
+          # 1. Install Vulkan Headers & Loader (Crucial fix for vulkan.h error)
+          sudo pacman -S --noconfirm mingw-w64-x86_64-vulkan-headers mingw-w64-x86_64-vulkan-loader
+
+          # 2. Master Variable Patch (Fixes "Unknown variable" errors)
+          cat <<EOF > mali_patch.txt
+          wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])
+          dll_ext = '.dll'
+          def_spec_ext = '.def'
+          lib_dxgi = declare_dependency(link_args: ['-ldxgi'])
+          lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])
+          lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])
+          EOF
+          sed -i '1r mali_patch.txt' meson.build
           
-          # Fix the Mali fork's internal missing links
-          PATCH="wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])\n"
-          PATCH+="dll_ext = '.dll'\n"
-          PATCH+="def_spec_ext = '.def'\n"
-          PATCH+="lib_dxgi = declare_dependency(link_args: ['-ldxgi'])\n"
-          PATCH+="lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])\n"
-          PATCH+="lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])"
-          sed -i "2i $PATCH" meson.build
-          
-          # Compile the DLLs
+          # 3. Build the DLLs
           mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "Mali-Universal"' > ./src/dxvk/dxvk_version.h
           chmod +x package-release.sh
           ./package-release.sh master build --no-package
