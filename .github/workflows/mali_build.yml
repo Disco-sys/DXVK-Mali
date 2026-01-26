@@ -1,49 +1,29 @@
-name: Build and Upload
-
-on: [push, pull_request, workflow_dispatch]
-
-jobs:
-  mali-build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Compiler & Fixes
+    - name: Compiler (LLVM-Clang Only)
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
-          # --- FIX 1: VULKAN HEADERS (The "Target Not Found" Fix) ---
-          # Don't download anything. Copy the headers ALREADY IN YOUR REPO to the system.
-          echo "Installing local Vulkan headers..."
+          # 1. Install Clang
+          sudo pacman -S --noconfirm mingw-w64-x86_64-clang
+
+          # 2. Fix Mandatory Headers (Build will fail without these)
           cp -r include/vulkan /usr/x86_64-w64-mingw32/include/
           cp -r include/spirv /usr/x86_64-w64-mingw32/include/
 
-          # --- FIX 2: MISSING VARIABLES (The "Meson" Fix) ---
-          # Define every single missing variable in one block.
+          # 3. Patch Variables (Required for Mali source code)
           cat <<EOF > mali_patch.txt
           wrc_generator = generator(find_program('windres'), output: '@BASENAME@.res', arguments: [ '@INPUT@', '@OUTPUT@' ])
           dll_ext = '.dll'
           def_spec_ext = '.def'
           lib_dxgi = declare_dependency(link_args: ['-ldxgi'])
           lib_d3d11 = declare_dependency(link_args: ['-ld3d11'])
-          lib_d3d10core = declare_dependency(link_args: ['-ld3d10core'])
-          lib_d3d9 = declare_dependency(link_args: ['-ld3d9'])
           EOF
-          
-          # Inject the patch safely into line 2 of meson.build
           sed -i '1r mali_patch.txt' meson.build
           
-          # --- FIX 3: BUILD ---
-          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "Mali-Universal"' > ./src/dxvk/dxvk_version.h
+          # 4. Use LLVM Compiler
+          export CC="clang"
+          export CXX="clang++"
+
+          # 5. Build
+          mkdir -p ./src/dxvk && echo '#define DXVK_VERSION "Mali-LLVM"' > ./src/dxvk/dxvk_version.h
           chmod +x package-release.sh
           ./package-release.sh master build --no-package
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dxvk-mali-universal
-        path: build/dxvk-master
