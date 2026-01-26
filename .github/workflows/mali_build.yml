@@ -1,4 +1,4 @@
-    - name: Compiler (LLVM-Clang Final)
+name: Compiler (LLVM-Clang Final)
       uses: Joshua-Ashton/arch-mingw-github-action@v8
       with:
         command: |
